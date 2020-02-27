@@ -1,38 +1,36 @@
 #!/usr/bin/env python3
 # _*_ coding:utf-8 _*_
-'''
- ____       _     _     _ _   __  __           _    
-|  _ \ __ _| |__ | |__ (_) |_|  \/  | __ _ ___| | __
-| |_) / _` | '_ \| '_ \| | __| |\/| |/ _` / __| |/ /
-|  _ < (_| | |_) | |_) | | |_| |  | | (_| \__ \   < 
-|_| \_\__,_|_.__/|_.__/|_|\__|_|  |_|\__,_|___/_|\_\
+# CVE-2014-4210
+# updated 2019/10/23
+# by 0xn0ne
 
-'''
-import logging
 import sys
-import requests
 
-logging.basicConfig(filename='Weblogic.log',
-                    format='%(asctime)s %(message)s',
-                    filemode="w", level=logging.INFO)
+# 有漏洞的情况
+# 端口不存在
+# An error has occurred
+# weblogic.uddi.client.structures.exception.XML_SoapException: Tried all: '1' addresses, but could not connect over HTTP to server: 'x.x.x.x', port: '80'
+# 端口存在
+# An error has occurred
+# weblogic.uddi.client.structures.exception.XML_SoapException: Received a response from url: http://x.x.x.x:7001 which did not have a valid SOAP content-type: text/html.
+from poc import universe, Star, target_type
+from utils import http
 
-headers = {'user-agent': 'ceshi/0.0.1'}
 
-def islive(ur,port):
-    url='http://' + str(ur)+':'+str(port)+'/uddiexplorer/'
-    r = requests.get(url, headers=headers)
-    return r.status_code
 
-def run(url,port):
-    if islive(url,port)==200:
-        u='http://' + str(url)+':'+str(port)+'/uddiexplorer/'
-        logging.info('[+]The target Weblogic UDDI module is exposed! The path is: {} Please verify the SSRF vulnerability!'.format(u))
-        print('[+]The target Weblogic UDDI module is exposed!\n[+]The path is: {}\n[+]Please verify the SSRF vulnerability!'.format(u))
-    else:
-        logging.info("[-]The target Weblogic UDDI module default path does not exist!")
-        print("[-]The target Weblogic UDDI module default path does not exist!")
+@universe.groups()
+class CVE_2014_4210(Star):
+    info = {
+        'NAME': 'webLogic server server-side-request-forgery',
+        'CVE': 'CVE-2014-4210',
+        'TAG': []
+    }
+    type = target_type.MODULE
 
-if __name__=="__main__":
-    url = sys.argv[1]
-    port = int(sys.argv[2])
-    run(url,port)
+    def light_up(self, dip, dport, *args, **kwargs) -> (bool, dict):
+        r, data = http('http://{}:{}/uddiexplorer/SearchPublicRegistries.jsp'.format(dip, dport))
+        if r and r.status_code == 200:
+            return True, {'url': r.url}
+        return False, {}
+
+

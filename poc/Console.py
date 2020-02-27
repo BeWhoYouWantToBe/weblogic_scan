@@ -1,38 +1,39 @@
 #!/usr/bin/env python3
 # _*_ coding:utf-8 _*_
-'''
- ____       _     _     _ _   __  __           _    
-|  _ \ __ _| |__ | |__ (_) |_|  \/  | __ _ ___| | __
-| |_) / _` | '_ \| '_ \| | __| |\/| |/ _` / __| |/ /
-|  _ < (_| | |_) | |_) | | |_| |  | | (_| \__ \   < 
-|_| \_\__,_|_.__/|_.__/|_|\__|_|  |_|\__,_|___/_|\_\
+# Weblogic Console
+# updated 2019/10/23
+# by 0xn0ne
 
-'''
-import logging
 import sys
-import requests
 
-logging.basicConfig(filename='Weblogic.log',
-                    format='%(asctime)s %(message)s',
-                    filemode="w", level=logging.INFO)
+from poc import Star, universe, target_type
+from utils import http
 
-headers = {'user-agent': 'ceshi/0.0.1'}
+headers = {'User-Agent': 'TestUA/1.0'}
 
-def islive(ur,port):
-    url='http://' + str(ur)+':'+str(port)+'/console/login/LoginForm.jsp'
-    r = requests.get(url, headers=headers)
-    return r.status_code
 
-def run(url,port):
-    if islive(url,port)==200:
-        u='http://' + str(url)+':'+str(port)+'/console/login/LoginForm.jsp'
-        logging.info("[+]The target Weblogic console address is exposed! The path is: {} Please try weak password blasting!".format(u))
-        print("[+]The target Weblogic console address is exposed!\n[+]The path is: {}\n[+]Please try weak password blasting!".format(u))
-    else:
-        logging.info('[-]Target Weblogic console address not found!')
-        print("[-]Target Weblogic console address not found!")
+@universe.groups()
+class WeblogicConsole(Star):
+    info = {
+        'NAME': 'weblogic administrator console',
+        'CVE': None,
+        'TAG': []
+    }
+    type = target_type.MODULE
 
-if __name__=="__main__":
-    url = sys.argv[1]
-    port = int(sys.argv[2])
-    run(url,port)
+    def light_up(self, dip, dport, path='console', *args, **kwargs) -> (bool, dict):
+        r, data = http('http://{}:{}/{}/login/LoginForm.jsp'.format(dip, dport, path))
+        if r and r.status_code == 200:
+            return True, {'url': r.url}
+        return False, {}
+
+
+# def run(dip, dport):
+#     res, url = islive(dip, dport)
+#     if res:
+#         print('[+] Found a module with Weblogic Console at {}:{}!'.format(dip, dport))
+#         print('[+] Path is: {}'.format(url))
+#         print('[+] Please try weak password blasting!')
+#     else:
+#         print('[-] Target {}:{} does not detect Weblogic Console vulnerability!'.format(dip, dport))
+
